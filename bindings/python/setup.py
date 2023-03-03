@@ -232,7 +232,7 @@ Further information is available at http://www.unicorn-engine.org
 
 setup(
     provides=['unicorn'],
-    packages=['unicorn'],
+    packages=['unicorn', 'unicorn.arch'],
     name='unicorn',
     version=VERSION,
     author='Nguyen Anh Quynh',
