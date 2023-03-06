@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Mapping, Mu
 import ctypes
 import functools
 import weakref
-import logging
 
 from . import unicorn_const as uc
 from .arch.types import *
@@ -277,7 +276,7 @@ if TYPE_CHECKING:
     _CFP = TypeVar('_CFP', bound=ctypes._FuncPointer)
 
 
-def uccallback(functype: Type[_CFP]):
+def uccallback(uc: Uc, functype: Type[_CFP]):
     """Unicorn callback decorator.
 
     Wraps a Python function meant to be dispatched by Unicorn as a hook callback.
@@ -290,14 +289,13 @@ def uccallback(functype: Type[_CFP]):
     def decorate(func) -> _CFP:
 
         @functools.wraps(func)
-        def wrapper(uc: Uc, *args, **kwargs):
+        def wrapper(*args, **kwargs):
             try:
-                return func(uc, *args, **kwargs)
+                return func(*args, **kwargs)
             except Exception as e:
-                logging.exception("Exception in hook:")
                 # If multiple hooks raise exceptions, just use the first one
-                # if uc._hook_exception is None:
-                #     uc._hook_exception = e
+                if uc._hook_exception is None:
+                    uc._hook_exception = e
 
                 uc.emu_stop()
 
@@ -674,13 +672,13 @@ class Uc(RegStateManager):
             read_cb: Optional[UC_MMIO_READ_TYPE], user_data_read: Any,
             write_cb: Optional[UC_MMIO_WRITE_TYPE], user_data_write: Any) -> None:
 
-        @uccallback(MMIO_READ_CFUNC)
+        @uccallback(self, MMIO_READ_CFUNC)
         def __mmio_map_read_cb(handle: int, offset: int, size: int, key: int) -> int:
             assert read_cb is not None
 
             return read_cb(self, offset, size, user_data_read)
 
-        @uccallback(MMIO_WRITE_CFUNC)
+        @uccallback(self, MMIO_WRITE_CFUNC)
         def __mmio_map_write_cb(handle: int, offset: int, size: int, value: int, key: int) -> None:
             assert write_cb is not None
 
@@ -805,7 +803,7 @@ class Uc(RegStateManager):
         """
 
         def __hook_intr():
-            @uccallback(HOOK_INTR_CFUNC)
+            @uccallback(self, HOOK_INTR_CFUNC)
             def __hook_intr_cb(handle: int, intno: int, key: int):
                 callback(self, intno, user_data)
 
@@ -818,42 +816,42 @@ class Uc(RegStateManager):
             raise UcError(uc.UC_ERR_ARG)
 
         def __hook_code():
-            @uccallback(HOOK_CODE_CFUNC)
+            @uccallback(self, HOOK_CODE_CFUNC)
             def __hook_code_cb(handle: int, address: int, size: int, key: int):
                 callback(self, address, size, user_data)
 
             return __hook_code_cb,
 
         def __hook_invalid_mem():
-            @uccallback(HOOK_MEM_INVALID_CFUNC)
+            @uccallback(self, HOOK_MEM_INVALID_CFUNC)
             def __hook_mem_invalid_cb(handle: int, access: int, address: int, size: int, value: int, key: int) -> bool:
                 return callback(self, access, address, size, value, user_data)
 
             return __hook_mem_invalid_cb,
 
         def __hook_mem():
-            @uccallback(HOOK_MEM_ACCESS_CFUNC)
+            @uccallback(self, HOOK_MEM_ACCESS_CFUNC)
             def __hook_mem_access_cb(handle: int, access: int, address: int, size: int, value: int, key: int) -> None:
                 callback(self, access, address, size, value, user_data)
 
             return __hook_mem_access_cb,
 
         def __hook_invalid_insn():
-            @uccallback(HOOK_INSN_INVALID_CFUNC)
+            @uccallback(self, HOOK_INSN_INVALID_CFUNC)
             def __hook_insn_invalid_cb(handle: int, key: int) -> bool:
                 return callback(self, user_data)
 
             return __hook_insn_invalid_cb,
 
         def __hook_edge_gen():
-            @uccallback(HOOK_EDGE_GEN_CFUNC)
+            @uccallback(self, HOOK_EDGE_GEN_CFUNC)
             def __hook_edge_gen_cb(handle: int, cur: ctypes._Pointer[uc_tb], prev: ctypes._Pointer[uc_tb], key: int):
                 callback(self, cur.contents, prev.contents, user_data)
 
             return __hook_edge_gen_cb,
 
         def __hook_tcg_opcode():
-            @uccallback(HOOK_TCG_OPCODE_CFUNC)
+            @uccallback(self, HOOK_TCG_OPCODE_CFUNC)
             def __hook_tcg_op_cb(handle: int, address: int, arg1: int, arg2: int, key: int):
                 callback(self, address, arg1, arg2, user_data)
 
