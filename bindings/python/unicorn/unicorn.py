@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Mapping, Mu
 import ctypes
 import functools
 import weakref
+import logging
 
 from . import unicorn_const as uc
 from .arch.types import *
@@ -293,9 +294,10 @@ def uccallback(functype: Type[_CFP]):
             try:
                 return func(uc, *args, **kwargs)
             except Exception as e:
+                logging.exception("Exception in hook:")
                 # If multiple hooks raise exceptions, just use the first one
-                if uc._hook_exception is None:
-                    uc._hook_exception = e
+                # if uc._hook_exception is None:
+                #     uc._hook_exception = e
 
                 uc.emu_stop()
 
